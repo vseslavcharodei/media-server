@@ -1,0 +1,106 @@
+version: '3.7'
+services:
+  # Plex
+  # Personal media server with movies and tv-series
+  plex:
+    image: linuxserver/plex:latest
+    container_name: plex
+    ports:
+      #- 1900:1900
+      #- 3005:3005
+      - 32400:32400
+      #- 32410:32410
+      #- 32412:32412
+      #- 32413:32413
+      #- 32414:32414
+      #- 32469:32469
+      #- 5353:5353
+      #- 8324:8324
+    env_file:
+      - .env
+    environment:
+      VERSION: docker
+    volumes:
+      - ${MEDIA_VOLUME}/provision/plex:/config
+      - ${MEDIA_VOLUME}/media:/data/media
+    restart: unless-stopped
+    networks:
+      - media-network
+
+  # qbittorrent
+  # A torrent client for downloading media
+  qbittorrent:
+    image: linuxserver/qbittorrent
+    container_name: qbittorrent
+    env_file:
+      - .env
+    volumes:
+      - ${MEDIA_VOLUME}/provision/qbittorrent:/config
+      - ${MEDIA_VOLUME}/torrents:/data/torrents
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    networks:
+      - media-network
+
+  # Sonarr
+  # A TV series manager for grabing, sorting and organizing new series
+  sonarr:
+    container_name: sonarr
+    image: linuxserver/sonarr:develop # v4
+    restart: unless-stopped
+    depends_on:
+      - prowlarr
+      - qbittorrent
+    env_file:
+      - .env
+    volumes:
+      - ${MEDIA_VOLUME}/provision/sonarr:/config
+      # Media volumes are organized using this guide:
+      # https://wiki.servarr.com/docker-guide#consistent-and-well-planned-paths
+      - ${MEDIA_VOLUME}:/data
+    ports:
+      - 8989:8989
+    networks:
+      - media-network
+
+  # Radarr
+  # A movie collection manager for grabing and downloading movies
+  radarr:
+    image: linuxserver/radarr:latest
+    container_name: radarr
+    restart: unless-stopped
+    depends_on:
+      - prowlarr
+      - qbittorrent
+    env_file:
+      - .env
+    volumes:
+      - ${MEDIA_VOLUME}/provision/radarr:/config
+      # Media volumes are organized using this guide:
+      # https://wiki.servarr.com/docker-guide#consistent-and-well-planned-paths
+      - ${MEDIA_VOLUME}:/data
+    ports:
+      - 7878:7878
+    networks:
+      - media-network
+
+  # Prowlarr
+  # Indexer manager/proxy for torrent trackers
+  prowlarr:
+    container_name: prowlarr
+    image: linuxserver/prowlarr:latest
+    restart: unless-stopped
+    depends_on:
+      - qbittorrent
+    env_file:
+      - .env
+    volumes:
+      - ${MEDIA_VOLUME}/provision/prowlarr:/config
+    ports:
+      - 9696:9696
+    networks:
+      - media-network
+
+networks:
+  media-network:
